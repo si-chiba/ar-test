@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="aframe.min.js"></script>
+    <script src="aframe-ar.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs>
+        <a-marker type="pattern" url="pattern-marker.patt">
+            <!-- 直接ファイルを指定 -->
+            <a-image src="chiba-kun.png" rotation="-90 0 0" scale="2 2 2"></a-image>
+        </a-marker>
+        <a-entity camera></a-entity>
+    </a-scene>
+</body>
+</html>
