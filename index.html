@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>チーバくん AR (Strict Eco Mode)</title>
+
+    <script src="aframe.min.js"></script>
+    <script src="aframe-ar.js"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        
+        /* 終了画面：復帰ボタンを置かず、真っ暗な画面にします */
+        #termination-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: black; z-index: 9999;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            color: #333; font-family: sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 2分経過後にこの画面に切り替わり、操作不能になります -->
+    <div id="termination-overlay">
+        <p>SESSION TERMINATED</p>
+    </div>
+
+    <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+        
+        <a-assets>
+            <img id="my-image" src="chiba-kun.png">
+        </a-assets>
+
+        <a-marker id="target-marker" type="pattern" url="pattern-marker.patt">
+            <!-- キャラクターを左に50cm寄せた配置 -->
+            <a-image 
+                src="#my-image" 
+                width="1" height="1.48"
+                rotation="-90 0 0" 
+                position="-0.5 0.2 0.5" 
+                scale="8 8 8"
+                material="transparent: true; alphaTest: 0.5; side: double;">
+            </a-image>
+        </a-marker>
+        
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        let idleTimer;
+        const TWO_MINUTES = 120000; // 2分
+
+        function resetTimer() {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(terminateSession, TWO_MINUTES);
+        }
+
+        function terminateSession() {
+            const scene = document.querySelector('a-scene');
+            const video = document.querySelector('video');
+
+            // 1. ARシーンのシステムを完全にシャットダウン
+            if (scene) {
+                scene.pause();
+                scene.parentNode.removeChild(scene); // 3D空間そのものを削除
+            }
+
+            // 2. カメラストリームを物理的に切断（電池保護の核心）
+            if (video && video.srcObject) {
+                const tracks = video.srcObject.getTracks();
+                tracks.forEach(track => track.stop());
+                video.remove(); // ビデオ要素も削除
+            }
+
+            // 3. 画面を真っ暗にし、復帰用UIを表示させない
+            document.getElementById('termination-overlay').style.display = 'flex';
+            
+            // 全てのイベントリスナーを無効化
+            window.removeEventListener('touchstart', resetTimer);
+            window.removeEventListener('mousedown', resetTimer);
+        }
+
+        // 操作検知
+        window.addEventListener('touchstart', resetTimer);
+        window.addEventListener('mousedown', resetTimer);
+
+        // 起動
+        resetTimer();
+    </script>
+</body>
+</html>
