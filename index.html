@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>チーバくん AR Pro - Stable Edition</title>
+
+    <!-- ローカルライブラリ -->
+    <script src="aframe.js"></script>
+    <script src="aframe-ar.js"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center;
+            align-items: center; z-index: 1000; color: white; text-align: center;
+        }
+        #start-screen { background: linear-gradient(135deg, #4c97ff, #3373cc); }
+        #sleep-screen { background: rgba(0,0,0,0.95); display: none; backdrop-filter: blur(10px); }
+
+        .btn-ui {
+            background-color: #ffab19; color: white; border: none;
+            padding: 20px 50px; font-size: 22px; font-weight: bold;
+            border-radius: 50px; cursor: pointer; box-shadow: 0 5px 0 #cf8b12;
+        }
+        .btn-ui:active { transform: translateY(3px); box-shadow: 0 2px 0 #cf8b12; }
+
+        #ui-container {
+            position: fixed; bottom: 50px; left: 0; width: 100%;
+            display: none; flex-direction: column; align-items: center;
+            z-index: 500; pointer-events: none;
+        }
+        .capture-button {
+            width: 90px; height: 90px; background: white;
+            border: 8px solid #ff4c4c; border-radius: 50%;
+            cursor: pointer; pointer-events: auto;
+        }
+        .guide-msg {
+            margin-bottom: 20px; background: rgba(0,0,0,0.8);
+            color: white; padding: 12px 24px; border-radius: 30px; font-size: 15px;
+        }
+
+        #flash {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; z-index: 2000; pointer-events: none;
+        }
+
+        .a-enter-vr { display: none !important; }
+    </style>
+</head>
+
+<body>
+
+    <div id="flash"></div>
+
+    <!-- 起動画面 -->
+    <div id="start-screen" class="overlay">
+        <h1 style="font-size: 28px; margin-bottom: 15px;">CHIBA-AR SYSTEM</h1>
+        <p style="opacity: 0.8; margin-bottom: 30px;">ローカルライブラリ: 稼働準備完了</p>
+        <button class="btn-ui" onclick="startSystem()">システム起動</button>
+    </div>
+
+    <!-- スリープ画面 -->
+    <div id="sleep-screen" class="overlay">
+        <h2 style="color: #ffab19;">SLEEP MODE</h2>
+        <p>省電力のため動作を一時停止しました</p>
+        <button class="btn-ui" onclick="location.reload()">再起動</button>
+    </div>
+
+    <!-- 撮影UI -->
+    <div id="ui-container">
+        <div id="guide-msg" class="guide-msg">マーカーをスキャンしてください</div>
+        <button class="capture-button" onclick="takeSnapshot()"></button>
+    </div>
+
+    <!-- ARシーン（最初からHTMLに配置） -->
+    <a-scene
+        id="ar-scene"
+        embedded
+        arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+        renderer="antialias: true; preserveDrawingBuffer: true; colorManagement: true;"
+        vr-mode-ui="enabled: false">
+
+        <a-assets>
+            <img id="chiba-img" src="chiba-kun.png">
+        </a-assets>
+
+        <a-marker id="main-marker" type="pattern" url="pattern-marker.patt">
+            <a-image
+                src="#chiba-img"
+                position="0 0.5 0"
+                rotation="-90 0 0"
+                width="2" height="2.96"
+                animation="property: position; to: 0 0.8 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutQuad">
+            </a-image>
+        </a-marker>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        let idleTimer;
+        const IDLE_LIMIT = 120000; // 2分
+
+        // 起動処理
+        function startSystem() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('ui-container').style.display = 'flex';
+            resetTimer();
+        }
+
+        // A-Frame 初期化後にイベント登録
+        AFRAME.scenes[0].addEventListener('loaded', () => {
+            const marker = document.getElementById('main-marker');
+
+            marker.addEventListener('markerFound', () => {
+                document.getElementById('guide-msg').innerText = "ターゲット捕捉：撮影可能";
+                resetTimer();
+            });
+
+            marker.addEventListener('markerLost', () => {
+                document.getElementById('guide-msg').innerText = "マーカーを探しています...";
+            });
+        });
+
+        // video が生成されるまで待つ
+        function waitForVideo() {
+            return new Promise(resolve => {
+                const check = () => {
+                    const v = document.querySelector('video');
+                    if (v) resolve(v);
+                    else requestAnimationFrame(check);
+                };
+                check();
+            });
+        }
+
+        // 撮影処理
+        async function takeSnapshot() {
+            const scene = document.querySelector('a-scene');
+            const video = await waitForVideo();
+            const flash = document.getElementById('flash');
+
+            flash.style.transition = 'none';
+            flash.style.opacity = '1';
+            setTimeout(() => {
+                flash.style.transition = 'opacity 0.5s';
+                flash.style.opacity = '0';
+            }, 50);
+
+            const canvas = scene.canvas;
+            const output = document.createElement('canvas');
+            output.width = canvas.width;
+            output.height = canvas.height;
+            const ctx = output.getContext('2d');
+
+            ctx.drawImage(video, 0, 0, output.width, output.height);
+            ctx.drawImage(canvas, 0, 0, output.width, output.height);
+
+            const link = document.createElement('a');
+            link.download = `chiba-capture-${Date.now()}.png`;
+            link.href = output.toDataURL('image/png');
+            link.click();
+
+            resetTimer();
+        }
+
+        // スリープ管理
+        function resetTimer() {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                document.getElementById('sleep-screen').style.display = 'flex';
+                document.getElementById('ui-container').style.display = 'none';
+            }, IDLE_LIMIT);
+        }
+
+        window.addEventListener('touchstart', resetTimer);
+    </script>
+
+</body>
+</html>
