@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>チーバくんと写真をとろう！ AR</title>
+
+    <script src="aframe.min.js"></script>
+    <script src="aframe-ar.js"></script>
+
+    <style>
+        /* 全体の余白をゼロにし、背景を黒にしてカメラ起動を待つ */
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #000; }
+
+        /* 起動前の案内画面：画面いっぱいに表示し、一番手前に配置 */
+        #start-screen {
+            position: fixed; /* 画面に固定 */
+            top: 0; left: 0; width: 100%; height: 100%; /* 全画面をカバー */
+            background: linear-gradient(135deg, #4c97ff, #3373cc); /* Scratch風の青色グラデーション */
+            display: flex; flex-direction: column; justify-content: center; align-items: center; /* 中央揃え */
+            z-index: 9999; /* 他の要素より必ず上に表示 */
+            color: white; text-align: center; padding: 20px; box-sizing: border-box;
+        }
+
+        /* スタートボタンのデザイン */
+        .start-button {
+            background-color: #ffab19; color: white; border: none; /* オレンジ色に白文字 */
+            padding: 18px 45px; font-size: 22px; font-weight: bold; /* 大きめのサイズ */
+            border-radius: 50px; cursor: pointer; box-shadow: 0 4px 0 #cf8b12; /* 丸みと立体感 */
+        }
+
+        /* 撮影案内のメッセージレイヤー */
+        #ui-layer {
+            position: fixed; top: 30px; left: 0; width: 100%; /* 画面上部に配置 */
+            z-index: 1000; text-align: center; pointer-events: none; /* クリックを邪魔しない設定 */
+            display: none; /* 最初は非表示 */
+            transition: opacity 0.5s; /* 消える時にふわっとさせる */
+        }
+
+        /* メッセージの背景と文字のデザイン */
+        .guide-text {
+            display: inline-block; background: rgba(0,0,0,0.6); color: white; /* 半透明の黒背景に白文字 */
+            padding: 12px 24px; border-radius: 50px; font-size: 14px; /* 読みやすい余白とサイズ */
+        }
+
+        /* CSSで不透明度を0にするためのクラス */
+        .hide { opacity: 0 !important; }
+        
+        /* AR映像が表示されるコンテナ */
+        #ar-container { width: 100%; height: 100%; }
+    </style>
+</head>
+
+<body>
+
+    <div id="start-screen">
+        <h1 style="font-size: 32px;">チーバくんと写真をとろう！</h1>
+        <p style="font-size: 18px; line-height: 1.6;">
+            「スタート！」を押すとカメラが起動します。<br>
+            ブラウザの「許可」ボタンを押してね！
+        </p>
+        <button class="start-button" onclick="startAR()">スタート！</button>
+    </div>
+
+    <div id="ui-layer">
+        <div class="guide-text">撮影はスクリーンショットでお願いします</div>
+    </div>
+
+    <div id="ar-container"></div>
+
+    <script>
+        // スタートボタンが押された時の処理
+        function startAR() {
+            // スタート画面を非表示にする
+            document.getElementById('start-screen').style.display = 'none';
+            
+            // ARを表示するためのHTML要素を組み立てる
+            const container = document.getElementById('ar-container');
+            container.innerHTML = `
+                <a-scene embedded arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+                    <a-assets>
+                        <img id="my-image" src="chiba-kun.png">
+                    </a-assets>
+
+                    <a-marker id="target-marker" type="pattern" url="pattern-marker.patt">
+                        <a-image 
+                            src="#my-image" 
+                            width="1" height="1.48"
+                            rotation="-90 0 0" 
+                            position="1.2 0.2 0.5" 
+                            scale="8 8 8"
+                            material="transparent: true; alphaTest: 0.5; side: double;">
+                        </a-image>
+                    </a-marker>
+                    <a-entity camera></a-entity>
+                </a-scene>
+            `;
+
+            // 今作成したばかりのマーカー要素を取得
+            const marker = document.getElementById('target-marker');
+            // メッセージを表示するためのレイヤーを取得
+            const uiLayer = document.getElementById('ui-layer');
+
+            // マーカーがカメラに映った（認識された）瞬間に実行されるイベント
+            marker.addEventListener('markerFound', () => {
+                // メッセージレイヤーを表示状態にする
+                uiLayer.style.display = 'block';
+                // 念のためhideクラス（透明にする設定）を消しておく
+                uiLayer.classList.remove('hide');
+
+                // 3秒（3000ミリ秒）後に隠す処理を実行
+                setTimeout(() => {
+                    // hideクラスを付けてふわっと消す
+                    uiLayer.classList.add('hide');
+                }, 3000);
+            });
+        }
+
+        // 画面のどこかをタップした時にメッセージを再表示する機能
+        window.addEventListener('click', () => {
+            const uiLayer = document.getElementById('ui-layer');
+            // すでにARが始まっている場合のみ実行
+            if (uiLayer.style.display === 'block') {
+                uiLayer.classList.remove('hide'); // 再表示
+                // また3秒後に隠す
+                setTimeout(() => uiLayer.classList.add('hide'), 3000);
+            }
+        });
+    </script>
+</body>
+</html>
